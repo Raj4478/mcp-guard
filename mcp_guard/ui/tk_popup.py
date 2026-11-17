@@ -29,10 +29,13 @@ from typing import TYPE_CHECKING, Any
 
 from mcp_guard.config import Settings
 from mcp_guard.models import ApprovalRequest, Decision, Verdict
+from mcp_guard.ui import macos
 
 if TYPE_CHECKING:
     from mcp_guard.broker import ApprovalBroker
 
+# One constant for the Tk title and the macOS window matcher, so they cannot drift apart.
+POPUP_TITLE = "MCP Guard - approval needed"
 FONT = "Segoe UI" if sys.platform == "win32" else "Helvetica"
 MONO = "Consolas" if sys.platform == "win32" else "Courier"
 GREEN, GREEN_DARK = "#1a7f37", "#116329"
@@ -104,6 +107,7 @@ class TkApprovalUI:
         _enable_dpi_awareness()
         self._stop = stop_event
         self.root = root = tk.Tk()
+        macos.make_accessory_app()  # macOS: lets popups appear over full-screen apps
         root.title("MCP Guard")
         root.geometry("860x380")
         root.minsize(640, 260)
@@ -230,7 +234,7 @@ class _Popup:
         self.closed = False
         self.win = win = tk.Toplevel(ui.root)
         win.withdraw()  # position it before it is shown, or Windows picks its own spot
-        win.title("MCP Guard - approval needed")
+        win.title(POPUP_TITLE)
         win.resizable(True, True)
         win.minsize(520, 420)
         win.attributes("-topmost", True)
@@ -241,8 +245,18 @@ class _Popup:
         win.deiconify()
         win.attributes("-topmost", True)
         win.lift()
+        if sys.platform == "darwin":
+            # Make Tk create the native window now, then let it join every Space
+            # (including a full-screen Claude). No focus_force here: activating
+            # the app would switch the user away from Claude's Space.
+            win.update_idletasks()
+            macos.float_over_all_spaces(POPUP_TITLE)
+        else:
+            try:
+                win.focus_force()
+            except tk.TclError:
+                pass
         try:
-            win.focus_force()
             win.bell()
         except tk.TclError:
             pass

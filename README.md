@@ -18,7 +18,7 @@ MCP Guard is a Python app that monitors Model Context Protocol (MCP) traffic fro
 | Monitor MCP requests from Claude Desktop | A stdio proxy wraps every local MCP server in `claude_desktop_config.json` (`mcp-guard install`) |
 | Monitor MCP requests from Claude Web | An HTTP gateway sits in front of a remote MCP server; you add the gateway URL as the claude.ai custom connector |
 | Capture server, tool and parameters | The popup shows source, client (`clientInfo`), server, tool name and title, the tool's description and hints (read-only / destructive, taken from `tools/list`), and the full arguments as JSON |
-| Popup above other windows | Tk window with `-topmost`, checked every second and set again only if something removed it; centred, with a sound when it opens |
+| Popup above other windows | Tk window with `-topmost`, checked every second and set again only if something removed it; centred, with a sound when it opens. On macOS it also appears over full-screen apps such as a full-screen Claude (see the architecture doc) |
 | Allow / Block | Two buttons. Esc or closing the window means Block. Allow ignores clicks for the first 0.7 s so a stray click or keypress can't approve something you haven't read |
 | Keep the request pending | The request is held in the proxy or gateway. Other traffic (initialize, `tools/list`, ping) keeps flowing, so Claude does not freeze |
 | Allowed → forward | The original bytes are sent to the server unchanged |
@@ -187,7 +187,7 @@ python -m pip install -e ".[dev]"
 python -m pytest -q
 ```
 
-33 tests. They use real subprocesses and real sockets, with a scripted "user" in place of the popup. They cover:
+35 tests (one runs only on macOS, one only elsewhere). They use real subprocesses and real sockets, with a scripted "user" in place of the popup. They cover:
 
 * allow and block
 * non-tool traffic flowing while a call is held
@@ -215,6 +215,7 @@ python -m pytest -q
 ## Limitations
 
 * **Anthropic-hosted connectors** (the built-in Google Drive, Gmail and similar integrations) run entirely inside Anthropic's cloud, with no hop you control, so they can't be intercepted. MCP Guard covers every local server, and every remote server whose URL you register through the gateway.
+* **macOS:** the daemon runs as an accessory app, so it has no Dock icon. Use `mcp-guard show` to open the dashboard. Approval popups follow you onto any Space, full-screen apps included; the dashboard stays on the desktop Space.
 * **Desktop Extensions** (`.mcpb` bundles installed from Claude Desktop's Extensions page) are launched by the app and aren't listed in `claude_desktop_config.json`. To guard one, add its server as a regular config entry instead.
 * Requests that the *server* sends to the client (sampling, elicitation) aren't gated. They are passed through.
 * The gateway rewrites the legacy SSE `endpoint` event so that it points at itself, but it doesn't rewrite OAuth metadata URLs. For OAuth-protected upstreams, run the gateway without a path secret.
