@@ -126,7 +126,21 @@ JSON-RPC batches (allowed by the 2025-03-26 spec) are handled as a unit. Every g
 | Malformed JSON from the client | Forwarded unchanged, so the server returns its own parse error. The proxy never invents protocol behaviour |
 | Bad config values | Logged and replaced with defaults. Startup never fails because of a typo |
 
-## 5. Security model
+## 5. macOS: popups over full-screen apps
+
+On macOS every full-screen app has its own **Space** (virtual desktop). A new window from another app opens on that app's own Space, normally the plain desktop, and never over someone else's full-screen Space. `-topmost` doesn't help, because it only orders windows within one Space. With Claude running full screen, the popup was created correctly but on a Space the user wasn't looking at, so the request timed out and was blocked.
+
+How it was diagnosed: Tk reported the popup as mapped, visible and topmost. The macOS window server (`CGWindowListCopyWindowInfo`) showed it at the right position on the floating layer (19), but `onscreen=false`, so it was on the wrong Space. A crash, a bad position, or the window sitting behind Claude were all ruled out.
+
+The fix, in `mcp_guard/ui/macos.py`:
+
+1. The daemon becomes an **accessory app** (`setActivationPolicy:` = Accessory, so no Dock icon). macOS only lets accessory apps put windows over a full-screen Space.
+2. Each popup's NSWindow gets `canJoinAllSpaces | fullScreenAuxiliary`, added to the flags Tk already set. It is then hidden and re-shown with `orderFrontRegardless`, because new flags don't move a window that is already on a Space.
+3. The app is **never activated**, so the user stays in Claude's Space. Activating it was tried, and it switched the user to the desktop, which is worse than the bug.
+
+Tk has no API for these settings, and the project avoids PyObjC, so the module calls the Objective-C runtime through `ctypes` (`objc_msgSend`). On Apple Silicon, `objc_msgSend` must be called through a prototype that matches each method exactly, so every call builds its own `CFUNCTYPE`. Tk doesn't expose its NSWindow either, so popups are found by title: one shared `POPUP_TITLE` constant is used for both the Tk title and the matcher, so the two can't drift apart. Everything is best-effort: on other platforms, or on any error, nothing happens, and the worst case is the old fail-closed behaviour. `tests/test_macos.py` opens a real popup on the macOS CI runner and reads the flags back from the NSWindow.
+
+## 6. Security model
 
 * **Trust boundary.** Anything that can run code as the user can already do anything the user can do, so the goal is to stop *other* parties (web pages, other users, remote callers) from forging or skipping approvals.
 * **IPC.** Bound to `127.0.0.1`. It needs a 256-bit bearer token, compared in constant time, stored in the user's profile folder and created with `O_EXCL` (0600 on POSIX). Requests with an `Origin` header or a non-loopback `Host` are refused, which blocks CSRF and DNS-rebinding attacks from browsers. Bodies are capped at 1 MB, and fields from IPC are clipped before display.
@@ -137,7 +151,7 @@ JSON-RPC batches (allowed by the 2025-03-26 spec) are handled as a unit. Every g
 * **Privacy.** The audit log keeps a SHA-256 of the arguments, not the arguments, unless `audit_log_arguments` is on.
 * **Gateway exposure.** The tunnel URL is public, so `path_secret` adds an unguessable first path segment. The upstream's own auth headers are passed through unchanged.
 
-## 6. Why these choices
+## 7. Why these choices
 
 * **Standard library only.** `http.server`, `http.client`, `subprocess`, `threading` and `tkinter` cover everything, so there is nothing extra to install and the attack surface is smaller.
 * **Threads, not asyncio.** On Windows, reading a console or pipe stdin asynchronously is unreliable. Blocking reads on dedicated threads are simple and portable. The amount of concurrency involved (a handful of pending calls) fits threads well.

@@ -70,4 +70,4 @@ In claude.ai: **Settings → Connectors → Add custom connector** → `https://
 
 ## 8. Wrap-up (15 s)
 
-Run `mcp-guard uninstall` to restore the config, then show the test run: `python -m pytest -q` (33 passed).
+Run `mcp-guard uninstall` to restore the config, then show the test run: `python -m pytest -q` (34 passed, 1 skipped on Windows).
