@@ -5,8 +5,9 @@ Tk is not thread-safe: the broker's worker threads only put events on a
 queue, and the Tk main loop (main thread) reads that queue every 100 ms.
 
 * One popup per pending request, offset so several are visible at once.
-* ``-topmost`` is re-applied every second, so a popup stays on top even if
-  another always-on-top window appears later.
+* ``-topmost`` is set when a popup opens and checked every second; it is set
+  again only if something removed it (re-setting it constantly makes the
+  window blink on Windows).
 * Allow is ignored for ``allow_button_delay_ms`` after a popup opens, so a
   stray Enter or double-click cannot approve something unread.
 * Esc and the window's close button mean Block. There is no default key
@@ -53,6 +54,23 @@ def _enable_dpi_awareness() -> None:
             ctypes.windll.shcore.SetProcessDpiAwareness(1)
         except Exception:
             pass
+
+
+def _lost_topmost(win: tk.Misc) -> bool:
+    """True if the window is no longer always-on-top (Windows only).
+
+    The topmost flag persists once set, so this is normally False. Elsewhere
+    we have no cheap way to check, and the flag also persists, so return False.
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+        hwnd = int(win.wm_frame(), 16)          # the outer frame window Tk created
+        ex_style = ctypes.windll.user32.GetWindowLongW(hwnd, -20)   # GWL_EXSTYLE
+        return not ex_style & 0x00000008                             # WS_EX_TOPMOST
+    except Exception:
+        return False
 
 
 class TkApprovalUI:
@@ -333,8 +351,11 @@ class _Popup:
         left = max(0, int(self.deadline - time.monotonic()))
         self.countdown_var.set(f"No answer in {left} s blocks this request automatically.")
         try:
-            self.win.attributes("-topmost", True)
-            self.win.lift()
+            # Re-apply "always on top" only if something removed it. Setting it
+            # (or raising the window) every second makes Windows repaint it,
+            # which shows up as a blink.
+            if _lost_topmost(self.win):
+                self.win.attributes("-topmost", True)
         except tk.TclError:
             return
         self.win.after(1000, self._tick)

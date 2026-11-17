@@ -18,7 +18,7 @@ MCP Guard is a Python app that monitors Model Context Protocol (MCP) traffic fro
 | Monitor MCP requests from Claude Desktop | A stdio proxy wraps every local MCP server in `claude_desktop_config.json` (`mcp-guard install`) |
 | Monitor MCP requests from Claude Web | An HTTP gateway sits in front of a remote MCP server; you add the gateway URL as the claude.ai custom connector |
 | Capture server, tool and parameters | The popup shows source, client (`clientInfo`), server, tool name and title, the tool's description and hints (read-only / destructive, taken from `tools/list`), and the full arguments as JSON |
-| Popup above other windows | Tk window with `-topmost`, applied again every second; centred, with a sound when it opens |
+| Popup above other windows | Tk window with `-topmost`, checked every second and set again only if something removed it; centred, with a sound when it opens |
 | Allow / Block | Two buttons. Esc or closing the window means Block. Allow ignores clicks for the first 0.7 s so a stray click or keypress can't approve something you haven't read |
 | Keep the request pending | The request is held in the proxy or gateway. Other traffic (initialize, `tools/list`, ping) keeps flowing, so Claude does not freeze |
 | Allowed → forward | The original bytes are sent to the server unchanged |
