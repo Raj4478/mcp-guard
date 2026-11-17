@@ -37,7 +37,7 @@ Standard library only. **No third-party packages** are needed to run it (Tk ship
 Requires **Python 3.10+** (tested on 3.13, Windows 11).
 
 ```bash
-git clone https://github.com/<you>/mcp-guard.git
+git clone https://github.com/Raj4478/mcp-guard.git
 cd mcp-guard
 python -m pip install -e .
 ```
